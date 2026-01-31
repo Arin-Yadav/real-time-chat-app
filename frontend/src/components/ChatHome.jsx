@@ -8,12 +8,13 @@ const ChatHome = () => {
   const [tempName, setTempName] = useState("");
   const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState("");
+  const [typers, setTypers] = useState([]);
   const messagesEndRef = useRef(null);
+  const timer = useRef(null);
 
   const socket = useRef(null);
   useEffect(() => {
     socket.current = connectWS();
-
     socket.current.on("connect", () => {
       socket.current.on("roomNotice", (userName) => {
         console.log(`${userName} has joined the room`);
@@ -22,11 +23,46 @@ const ChatHome = () => {
       socket.current.on("message", (message) => {
         setMessages((prev) => [...prev, message]);
       });
+
+      socket.current.on("typing", (userName) => {
+        setTypers((prev) => {
+          const isExist = prev.includes(userName);
+          if (!isExist) {
+            return [...prev, userName];
+          }
+          return prev;
+        });
+      });
+
+      socket.current.on("stopTyping", (userName) => {
+        setTypers((prev) => prev.filter((typers) => typers !== userName));
+      });
     });
-    //   return () => {
-    //     socket.disconnect();
-    //   };
+    return () => {
+      if (socket.current) {
+        socket.current.off("roomNotice");
+        socket.current.off("message");
+        socket.current.off("typing");
+        socket.current.off("stopTyping");
+        socket.current.disconnect();
+      }
+    };
   }, []);
+
+  useEffect(() => {
+    if (message) {
+      socket.current.emit("typing", userName);
+      clearTimeout(timer.current);
+    }
+
+    timer.current = setTimeout(() => {
+      socket.current.emit("stopTyping", userName);
+    }, 1000);
+
+    return () => {
+      clearTimeout(timer.current);
+    };
+  }, [message, userName]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -84,6 +120,15 @@ const ChatHome = () => {
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] overflow-y-auto max-w-screen bg-gray-100">
+      <div className="bg-gray-200 p-4 flex items-center justify-between h-16 sticky top-0 w-full z-50 shadow-md">
+        <div className="flex flex-col items-center">
+          <h1 className="sm:text-lg md:text-xl font-semibold flex items-center gap-2">
+            💬 Chat App
+          </h1>
+          {typers.length ? <p>{typers.join(", ")} is typing...</p> : ""}
+        </div>
+        <p className="text-xs sm:text-sm capitalize">Logged in as {userName}</p>
+      </div>
       {/* Main Content */}
       <div className="flex-1 flex flex-col bg-gray-50">
         <ul className="flex-1 px-3 sm:px-4 py-3 space-y-3 overflow-y-auto">
@@ -122,7 +167,7 @@ const ChatHome = () => {
       {/* Input */}
       <form
         onSubmit={handleSubmit}
-        className="flex items-center p-3 border-t bg-white sticky bottom-0 shadow-md">
+        className="flex items-center p-3 border-t border-gray-200 bg-white sticky bottom-0 shadow-md">
         <input
           value={message}
           onChange={(e) => setMessage(e.target.value)}
@@ -132,7 +177,7 @@ const ChatHome = () => {
         />
         <button
           type="submit"
-          className="ml-2 px-4 py-2 bg-green-600 text-white rounded-full hover:bg-green-700 transition">
+          className="ml-2 px-4 py-2 w-28 bg-green-600 text-white rounded-full hover:bg-green-700 transition">
           Send
         </button>
       </form>

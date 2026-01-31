@@ -43,12 +43,18 @@ io.on("connection", (socket) => {
 
     // broadcast
     socket.to(ROOM).emit("roomNotice", userName);
-    // io.to(ROOM).emit("message", message)
   });
 
   socket.on("message", (message) => {
-    io.to(ROOM).emit('message', message)
-    // console.log(message)  
+    io.to(ROOM).emit("message", message);
+  });
+
+  socket.on("typing", (userName) => {
+    socket.to(ROOM).emit("typing", userName);
+  });
+
+  socket.on("stopTyping", (userName) => {
+    socket.to(ROOM).emit("stopTyping", userName);
   });
 
   // socket.on("disconnect", () => {
